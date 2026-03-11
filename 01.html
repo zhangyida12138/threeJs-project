@@ -42,7 +42,7 @@
         scene.add(axesHelper);
         // 5. 添加一个绿色的方块 (物体 = 形状 + 材质)
         const geometry = new THREE.BoxGeometry(1, 1, 1); // 形状：立方体
-        const material = new THREE.MeshBasicMaterial(); // MeshNormalMaterial 会根据法线显示颜色，不需要灯光也能看清结构
+        const material = new THREE.MeshNormalMaterial(); // MeshNormalMaterial 会根据法线显示颜色，不需要灯光也能看清结构
         const cube = new THREE.Mesh(geometry, material); // 网格对象
         scene.add(cube); // 将方块放入场景
 
