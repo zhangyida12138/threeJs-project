@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>我的第一个 Three.js 页面</title>
+    <style> body { margin: 0; } </style>
+</head>
+<body>
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
+            }
+        }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        // Three.js 的核心库很精简，鼠标控制功能放在一个叫 OrbitControls 的扩展模块里。我们需要在代码顶部引入它。
+        import { OrbitControls } from 'https://unpkg.com/three@0.160.0/examples/jsm/controls/OrbitControls.js';
+        // 1. 创建场景
+        const scene = new THREE.Scene();
+
+        scene.background = new THREE.Color(0x202020); // 设置背景颜色为深灰色
+
+        // 2. 创建摄像机 (视野角度, 宽高比, 近剪裁面, 远剪裁面)
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(2,2,5); // 稍微斜着看，有立体感
+
+        // 3. 创建渲染器并添加到 DOM
+        const renderer = new THREE.WebGLRenderer({antialias: true}); // 开启抗锯齿
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+
+        // ----核心交互：初始化控制器
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true; // 启用阻尼效果(让旋转停下来时有惯性，手感更加丝滑)
+
+        // 4. 为了更好地观察空间，添加网格辅助
+        const gridHelper = new THREE.GridHelper(10, 10); // 大小10，分成10格
+        scene.add(gridHelper);
+        const axesHelper = new THREE.AxesHelper(5); // 红色代表 X 轴，绿色代表 Y 轴，蓝色代表 Z 轴
+        scene.add(axesHelper);
+        // 5. 添加一个绿色的方块 (物体 = 形状 + 材质)
+        const geometry = new THREE.BoxGeometry(1, 1, 1); // 形状：立方体
+        const material = new THREE.MeshBasicMaterial(); // MeshNormalMaterial 会根据法线显示颜色，不需要灯光也能看清结构
+        const cube = new THREE.Mesh(geometry, material); // 网格对象
+        scene.add(cube); // 将方块放入场景
+
+        // 6. 动画循环 (让方块动起来)
+        function animate() {
+            requestAnimationFrame(animate);
+
+            // --- 核心改动：必须在每一帧更新控制器 ---
+            controls.update();
+
+            renderer.render(scene, camera); // 核心：每一帧都重新渲染一次
+        }
+
+        // 7. 窗口大小自适应（防止拉伸）
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        animate();
+    </script>
+</body>
+</html>
