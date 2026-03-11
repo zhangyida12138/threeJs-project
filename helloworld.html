@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>我的第一个 Three.js 页面</title>
+    <style> body { margin: 0; } </style>
+</head>
+<body>
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
+            }
+        }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+
+        // 1. 创建场景
+        const scene = new THREE.Scene();
+
+        // 2. 创建摄像机 (视野角度, 宽高比, 近剪裁面, 远剪裁面)
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.z = 5; // 把相机往后挪一点，否则在方块中心
+
+        // 3. 创建渲染器并添加到 DOM
+        const renderer = new THREE.WebGLRenderer();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+
+        // 4. 添加一个绿色的方块 (物体 = 形状 + 材质)
+        const geometry = new THREE.BoxGeometry(1, 1, 1); // 形状：立方体
+        const material = new THREE.MeshBasicMaterial({ color: 0x00ff00 }); // 材质：基础绿色
+        const cube = new THREE.Mesh(geometry, material); // 网格对象
+        scene.add(cube); // 将方块放入场景
+
+        // 5. 动画循环 (让方块动起来)
+        function animate() {
+            requestAnimationFrame(animate);
+
+            // 让方块旋转
+            cube.rotation.x += 0.01;
+            cube.rotation.y += 0.01;
+
+            renderer.render(scene, camera); // 核心：每一帧都重新渲染一次
+        }
+
+        animate();
+    </script>
+</body>
+</html>
