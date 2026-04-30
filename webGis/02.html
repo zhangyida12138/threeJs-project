@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>WebGIS</title>
+  <!-- 引入Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+  integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+  crossorigin=""/>
+  <style>
+    /* 地图必须给宽高 */
+    #map {
+      width: 100%;
+      height: 600px;
+    }
+  </style>
+</head>
+<body>
+    <button type="button" id="back">back</button>
+  <div id="map"></div>
+
+  <!-- 原生引入 WebGIS 库 -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+     integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+     crossorigin=""></script>
+
+  <script>
+    const originalPos = [23.047, 113.771];
+    const map = L.map('map').setView(originalPos, 12);
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
+    // 坐标点列表
+    const pontiList = []
+    // 标记点列表
+    const markerList = []
+    // 当前线
+    let currentLine = null;
+    // 点击事件
+    map.on('click', (e) => {
+        pontiList.push(e.latlng);
+        const marker = L.marker(e.latlng).addTo(map).bindPopup(`纬度: ${e.latlng.lat.toFixed(3)}<br>经度: ${e.latlng.lng.toFixed(3)}`)
+        .openPopup();
+        markerList.push(marker);
+        if(pontiList.length >= 2) {
+            if(!currentLine) {
+              currentLine = L.polyline(pontiList, {color: 'red', weight: 2}).addTo(map);
+            } else {
+              currentLine.addLatLng(e.latlng);
+            }
+        }
+    });
+    // 清空数据
+    function clearData() {
+      markerList.forEach(marker => {
+        marker.remove();
+      });
+      currentLine && currentLine.remove();
+      markerList.length = 0;
+      pontiList.length = 0;
+      currentLine = null;
+    }
+    // 返回事件
+    back.addEventListener('click', () => {
+        map.flyTo(originalPos, 12);
+        clearData();
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>WebGIS</title>
+  <!-- 引入Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+  integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+  crossorigin=""/>
+  <style>
+    /* 地图必须给宽高 */
+    #map {
+      width: 100%;
+      height: 100vh;
+    }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+
+  <!-- 原生引入 WebGIS 库 -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+     integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+     crossorigin=""></script>
+
+  <script>
+    const map = L.map('map',{
+        attributionControl: false }
+    ).setView([22.3, 114.2], 10);
+
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+    fetch('https://geo.datav.aliyun.com/areas_v3/bound/810005.json')
+    .then(response => response.json())
+    .then(geoData => {
+        const boundary = L.geoJSON(geoData, {
+            style: {
+                color: 'red',       // 边界线颜色
+                weight: 2,          // 线宽
+                fillColor: '#fff',   // 填充色
+                fillOpacity: 0.2,     // 填充透明度
+                dashArray: '10, 8',
+                lineJoin: 'round'
+            }
+        }).addTo(map);
+    // 4. 自动缩放到区域
+    map.fitBounds(boundary.getBounds());
+    });
+  </script>
+</body>
+</html>

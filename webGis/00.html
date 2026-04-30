@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Leaflet 综合学习示例</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+     integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+     crossorigin=""/>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: system-ui, sans-serif; }
+    /* 地图容器：Leaflet 要求有明确高度 */
+    #map { width: 100%; height: 70vh; min-height: 360px; }
+    .panel {
+      padding: 12px 16px;
+      background: #1e293b;
+      color: #e2e8f0;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+    .panel h2 { margin: 0 0 8px; font-size: 15px; color: #94a3b8; font-weight: 600; }
+    .panel button {
+      margin: 4px 6px 4px 0;
+      padding: 6px 10px;
+      cursor: pointer;
+      border: 1px solid #475569;
+      background: #334155;
+      color: #f1f5f9;
+      border-radius: 4px;
+    }
+    .panel button:hover { background: #475569; }
+    #status { margin-top: 8px; font-family: ui-monospace, monospace; font-size: 12px; color: #a5b4fc; }
+    .leaflet-popup-content-wrapper { border-radius: 8px; }
+  </style>
+</head>
+<body>
+  <div class="panel">
+    <h2>演示操作（对应下方脚本中的 API）</h2>
+    <button type="button" id="btnFit">fitBounds 框选所有矢量</button>
+    <button type="button" id="btnFly">flyToBounds 动画飞到同一范围</button>
+    <button type="button" id="btnPan">panTo 平移到示例点</button>
+    <button type="button" id="btnToggleLayer">切换底图图层</button>
+    <button type="button" id="btnStyle">setStyle 改多边形样式</button>
+    <button type="button" id="btnOpenPopup">openPopup 打开折线气泡</button>
+    <div id="status"></div>
+  </div>
+  <div id="map"></div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+     integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+     crossorigin=""></script>
+  <script>
+    // ========== 1. 地图 L.map ==========
+    // 第二个参数是地图选项：worldCopyJump 在跨日界线时复制世界；zoomSnap 缩放步进
+    const guangzhouCenter = L.latLng(23.129, 113.264); // L.latLng：构造经纬度点
+    const map = L.map('map', {
+      center: guangzhouCenter,
+      zoom: 12,
+      minZoom: 3,
+      maxZoom: 18,
+      zoomSnap: 1,
+      worldCopyJump: true,
+      // 与 setMaxBounds 配合：小于 1 时边界略“软”，减少与弹窗 autoPan 死循环的概率
+      maxBoundsViscosity: 0.85
+    });
+
+    // L.tileLayer：栅格切片；maxZoom 不要超过服务支持
+    const osm = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+      maxZoom: 19
+    });
+
+    // 第二个底图用于 L.control.layers 切换
+    const cartoLight = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+      attribution: '&copy; OpenStreetMap &copy; CARTO',
+      subdomains: 'abcd',
+      maxZoom: 20
+    });
+
+    osm.addTo(map); // addTo(map) 等价于 map.addLayer(layer)
+
+    // ========== 2. 控件 ==========
+    // L.control.scale：比例尺；metric/imperial 单位
+    L.control.scale({ maxWidth: 160, metric: true, imperial: false }).addTo(map);
+
+    // L.control.layers：图层切换；第一个参数是底图组，第二个是叠加层组
+    const overlayLayers = {};
+    const layerControl = L.control.layers(
+      { 'OSM 标准': osm, 'Carto 浅色': cartoLight },
+      overlayLayers,
+      { collapsed: false, position: 'topright' }
+    ).addTo(map);
+
+    // L.control.zoom：可自定义加减按钮位置（默认已有，这里演示替换默认缩放控件）
+    map.zoomControl.remove();
+    L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+    // ========== 3. 边界与视野 ==========
+    // L.latLngBounds：西南角 + 东北角，用于限制拖拽范围或 fitBounds
+    const southWest = L.latLng(22.9, 113.0);
+    const northEast = L.latLng(23.35, 113.55);
+    const gzBounds = L.latLngBounds(southWest, northEast);
+    // 注意：硬边界 + 弹窗 keepInView/autoPan 同时开时，可能反复 pan 导致「Maximum call stack size exceeded」
+    map.setMaxBounds(gzBounds.pad(0.05)); // pad 按比例扩大边界，避免贴边无法拖动
+
+    // ========== 4. 矢量图层：折线、多边形、矩形、圆 ==========
+    // L.polyline：路径为 LatLng 数组；可通过 map.latLngToLayerPoint 等做屏幕坐标转换（此处不演示）
+    const routeCoords = [
+      [23.12, 113.25],
+      [23.14, 113.30],
+      [23.11, 113.34],
+      [23.08, 113.28]
+    ];
+    const polyline = L.polyline(routeCoords, {
+      color: '#6366f1',
+      weight: 4,
+      opacity: 0.85,
+      dashArray: '10, 8',
+      lineJoin: 'round'
+    });
+
+    // L.polygon：自动闭合；fillColor 与 stroke 分开设置
+    const campus = L.polygon([
+      [23.135, 113.265],
+      [23.142, 113.278],
+      [23.128, 113.285],
+      [23.120, 113.268]
+    ], {
+      color: '#0ea5e9',
+      weight: 2,
+      fillColor: '#38bdf8',
+      fillOpacity: 0.35
+    });
+
+    // L.rectangle：接受 L.latLngBounds
+    const rect = L.rectangle(
+      L.latLngBounds([23.05, 113.32], [23.09, 113.40]),
+      { color: '#f59e0b', weight: 2, fillOpacity: 0.2 }
+    );
+
+    // L.circle：半径单位是「米」；与 L.circleMarker（屏幕像素半径）不同
+    const circleM = L.circle([23.10, 113.22], {
+      radius: 2500,
+      color: '#ef4444',
+      fillColor: '#fca5a5',
+      fillOpacity: 0.4
+    });
+
+    // L.circleMarker：适合大量点，半径随缩放不变（像素）
+    const cm = L.circleMarker([23.16, 113.24], {
+      radius: 12,
+      color: '#22c55e',
+      fillColor: '#86efac',
+      fillOpacity: 0.9
+    });
+
+    // bindTooltip：默认鼠标悬停；permanent + direction 固定显示在要素旁
+    cm.bindTooltip('L.circleMarker（像素半径）', {
+      permanent: false,
+      direction: 'top',
+      className: 'bg-tip'
+    });
+
+    // ========== 5. L.marker 与自定义图标 ==========
+    const defaultMarker = L.marker(guangzhouCenter, {
+      title: 'title 属性：原生提示',
+      draggable: true, // 可拖拽，监听 dragend
+      opacity: 0.95,
+      riseOnHover: true
+    }).addTo(map);
+
+    defaultMarker.on('dragend', function (e) {
+      const p = e.target.getLatLng(); // getLatLng：获取当前位置
+      setStatus('标记拖拽结束：' + p.lat.toFixed(5) + ', ' + p.lng.toFixed(5));
+    });
+
+    // L.divIcon：用 HTML 做标记外观（注意设置 iconSize、iconAnchor 对齐针尖）
+    const divIcon = L.divIcon({
+      className: 'custom-div-icon',
+      html: '<div style="width:28px;height:28px;background:#7c3aed;border-radius:50%;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.35);"></div>',
+      iconSize: [28, 28],
+      iconAnchor: [14, 14]
+    });
+    const divMarker = L.marker([23.07, 113.38], { icon: divIcon });
+
+    // ========== 6. Popup 与 openOn ==========
+    // bindPopup 可传字符串或 DOM；选项：maxWidth、className、closeButton
+    defaultMarker.bindPopup(
+      '<b>默认 Marker</b><br>可拖拽。事件：<code>dragend</code>',
+      {
+        maxWidth: 260,
+        className: 'my-popup',
+        keepInView: false, // 与 setMaxBounds 并存时必须关，否则会 _adjustPan 递归爆栈
+        autoPan: true
+      }
+    );
+
+    polyline.bindPopup('折线 <code>L.polyline</code><br>bindPopup 绑在矢量上', {
+      keepInView: false,
+      autoPan: true
+    });
+
+    // L.popup 作为独立图层：setLatLng + setContent + openOn(map)
+    const standalone = L.popup({
+      autoPan: false, // 初始打开时避免与 maxBounds 争夺视野
+      keepInView: false
+    })
+      .setLatLng([23.18, 113.35])
+      .setContent('独立 <code>L.popup</code>，用 setContent / openOn')
+      .openOn(map);
+
+    // ========== 7. L.geoJSON：加载 GeoJSON 规范数据 ==========
+    const sampleGeoJson = {
+      type: 'FeatureCollection',
+      features: [
+        {
+          type: 'Feature',
+          properties: { name: '示例点' },
+          geometry: { type: 'Point', coordinates: [113.33, 23.13] } // GeoJSON 顺序是 [lng, lat]
+        },
+        {
+          type: 'Feature',
+          properties: { name: '示例线' },
+          geometry: {
+            type: 'LineString',
+            coordinates: [[113.36, 23.11], [113.39, 23.14], [113.37, 23.16]]
+          }
+        }
+      ]
+    };
+
+    const geoLayer = L.geoJSON(sampleGeoJson, {
+      // style：函数根据 feature 返回路径样式
+      style: function (feature) {
+        if (feature.geometry.type === 'LineString') {
+          return { color: '#a855f7', weight: 3, dashArray: '4,6' };
+        }
+        return {};
+      },
+      // onEachFeature：给每个要素绑事件/弹窗
+      onEachFeature: function (feature, layer) {
+        if (feature.properties && feature.properties.name) {
+          layer.bindPopup(feature.properties.name + '（来自 GeoJSON）', {
+            keepInView: false
+          });
+        }
+      },
+      // pointToLayer：点要素不用默认 marker 时可自定义为 circleMarker 等
+      pointToLayer: function (_feature, latlng) {
+        return L.circleMarker(latlng, { radius: 8, color: '#c026d3', fillOpacity: 0.8 });
+      }
+    });
+
+    // ========== 8. L.featureGroup：批量操作、统一 bounds ==========
+    // 矢量统一放进 FeatureGroup 再 addTo(map)，避免先单独 addTo 再入组导致重复挂载
+    const vectorGroup = L.featureGroup([
+      polyline, campus, rect, circleM, cm, divMarker, geoLayer
+    ]).addTo(map);
+    layerControl.addOverlay(vectorGroup, '演示矢量组（FeatureGroup）');
+
+    // getBounds：要素组合的外接矩形
+    const groupBounds = vectorGroup.getBounds();
+
+    // ========== 9. 地图事件：点击、缩放、移动 ==========
+    const statusEl = document.getElementById('status');
+    function setStatus(text) {
+      statusEl.textContent = text;
+    }
+
+    map.on('click', function (e) {
+      // e.latlng、e.containerPoint（相对地图容器）、e.originalEvent
+      setStatus(
+        'click: latlng=' + e.latlng.lat.toFixed(4) + ',' + e.latlng.lng.toFixed(4) +
+        ' | zoom=' + map.getZoom()
+      );
+    });
+
+    map.on('zoomend', function () {
+      // getBounds、getCenter、getZoom 常用于和服务器做范围查询
+      const b = map.getBounds();
+      setStatus(
+        'zoomend: zoom=' + map.getZoom() +
+        ' | 西南 ' + b.getSouthWest().toString() +
+        ' | 东北 ' + b.getNorthEast().toString()
+      );
+    });
+
+    // ========== 10. locate：浏览器定位 ==========
+    map.on('locationfound', function (e) {
+      // e.latlng、e.accuracy（米）、e.bounds
+      L.circle(e.latlng, {
+        radius: e.accuracy,
+        color: '#10b981',
+        fillOpacity: 0.15
+      }).addTo(map).bindPopup('定位精度约 ' + Math.round(e.accuracy) + ' m');
+      setStatus('locationfound: ' + e.latlng.toString());
+    });
+    map.on('locationerror', function (e) {
+      setStatus('locationerror: ' + e.message);
+    });
+
+    // watch、enableHighAccuracy、timeout 等选项按需使用
+    map.locate({ setView: false, maxZoom: 14, watch: false, enableHighAccuracy: true });
+
+    // ========== 11. 初始视野：flyTo 动画 ==========
+    map.flyTo(guangzhouCenter, 12, { animate: true, duration: 1.2 });
+
+    // ========== 12. 面板按钮：调用各类方法 ==========
+    document.getElementById('btnFit').addEventListener('click', function () {
+      // fitBounds：缩放到包含给定边界；padding 留白
+      map.fitBounds(groupBounds, { padding: [36, 36], maxZoom: 14 });
+    });
+    document.getElementById('btnFly').addEventListener('click', function () {
+      map.flyToBounds(groupBounds, { padding: [40, 40], maxZoom: 14, duration: 1.5 });
+    });
+    document.getElementById('btnPan').addEventListener('click', function () {
+      // panTo：不改变缩放级别，平滑平移
+      map.panTo([23.15, 113.42], { animate: true, duration: 0.8, easeLinearity: 0.25 });
+    });
+    let useCarto = false;
+    document.getElementById('btnToggleLayer').addEventListener('click', function () {
+      useCarto = !useCarto;
+      if (useCarto) {
+        map.removeLayer(osm);
+        cartoLight.addTo(map);
+      } else {
+        map.removeLayer(cartoLight);
+        osm.addTo(map);
+      }
+    });
+    document.getElementById('btnStyle').addEventListener('click', function () {
+      // setStyle：运行时修改路径样式（polygon、polyline、circle 等）
+      campus.setStyle({ fillColor: '#f472b6', color: '#db2777', fillOpacity: 0.5 });
+    });
+    document.getElementById('btnOpenPopup').addEventListener('click', function () {
+      polyline.openPopup();
+    });
+
+    // ========== 13. 其他常用 API（注释说明，避免页面过于拥挤）==========
+    // map.setView(center, zoom)        — 无动画直接设中心与级别
+    // map.flyTo(latlng, zoom, opts)    — 已演示
+    // map.invalidateSize()             — 容器从 display:none 变为显示后必须调用，否则瓦片错位
+    // map.removeLayer(layer)           — 移除图层
+    // map.hasLayer(layer)              — 判断是否已添加
+    // map.getPixelBounds()             — 当前视口像素范围
+    // map.latLngToContainerPoint(ll)   — 经纬度转容器内像素点
+    // L.Util.throttle / debounce       — 节流防抖，用于 resize 或 move 回调优化
+    // layer.bringToFront()             — 同一 Canvas 渲染的矢量层级（部分情况）
+    // marker.setLatLng(latlng)         — 程序移动标记
+    // layer.unbindPopup()              — 解绑弹窗
+
+    setStatus(
+      'getCenter: ' + map.getCenter().toString() +
+      ' | getZoom: ' + map.getZoom() +
+      ' | getBounds().contains(点): ' + map.getBounds().contains(L.latLng(23.13, 113.33))
+    );
+  </script>
+</body>
+</html>

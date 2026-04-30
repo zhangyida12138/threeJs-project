@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
+  <style>#map { width:100%; height:600px; }</style>
+</head>
+<body>
+<div id="map"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+
+<script>
+const map = L.map('map').setView([30.28, 120.15], 12);
+L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+// 聚合组
+const cluster = L.markerClusterGroup({
+  maxClusterRadius: 40, // 聚合半径
+});
+
+// 模拟 500 个公厕
+const toilets = [];
+for (let i=0; i<500; i++) {
+  toilets.push({
+    lat: 30.28 + (Math.random()-0.5)*0.2,
+    lng: 120.15 + (Math.random()-0.5)*0.2
+  });
+}
+
+// 添加到聚合图层
+toilets.forEach(t => {
+  L.marker([t.lat, t.lng])
+    .bindPopup('公共厕所')
+    .addTo(cluster);
+});
+
+map.addLayer(cluster);
+</script>
+</body>
+</html>
