@@ -1,0 +1,54 @@
+<div class="scroll-track"> <!-- 决定滚动长度 -->
+  <div class="sticky-box"> <!-- 被钉住的容器 -->
+    <div class="content-frame" id="frame1">内容 A</div>
+    <div class="content-frame" id="frame2" style="opacity:0">内容 B</div>
+    <div class="content-frame" id="frame3" style="opacity:0">内容 C</div>
+  </div>
+</div>
+
+<style>
+.scroll-track {
+  height: 400vh; /* 用户需要滚动 4 倍视口高度来完成动画 */
+}
+
+.sticky-box {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.content-frame {
+  position: absolute;
+  transition: opacity 0.3s; /* 简单的平滑过渡 */
+}
+</style>
+
+<script>
+window.addEventListener('scroll', () => {
+  const track = document.querySelector('.scroll-track');
+  const sticky = document.querySelector('.sticky-box');
+  
+  // 计算当前滚动进度 (0 到 1)
+  const rect = track.getBoundingClientRect();
+  const progress = Math.abs(rect.top) / (rect.height - window.innerHeight);
+  
+  if (progress >= 0 && progress <= 1) {
+    // 根据进度切换内容 (例如有三段内容)
+    const f1 = document.getElementById('frame1');
+    const f2 = document.getElementById('frame2');
+    const f3 = document.getElementById('frame3');
+
+    if (progress < 0.33) {
+      f1.style.opacity = 1; f2.style.opacity = 0; f3.style.opacity = 0;
+    } else if (progress < 0.66) {
+      f1.style.opacity = 0; f2.style.opacity = 1; f3.style.opacity = 0;
+    } else {
+      f1.style.opacity = 0; f2.style.opacity = 0; f3.style.opacity = 1;
+    }
+  }
+});
+</script>
